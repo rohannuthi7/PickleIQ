@@ -1,20 +1,18 @@
-# Pipeline Overview — Video In, Rally Coaching Out
+# Pipeline overview
 
 How a clip travels from upload to coaching feedback: what Pass 1 does, what the
 human does in Review, what Pass 2 does, and how the coaching report is built.
 
-**Scope.** This is the *end-to-end map*. Two companion docs go deeper and remain
-authoritative for their own areas — read them before changing behaviour there:
+This is the end-to-end map. Two companion docs go deeper on their own areas:
 
-| Doc | Owns |
+| Doc | Covers |
 |---|---|
-| [`detection-spec.md`](detection-spec.md) | Detection internals, thresholds, learnable params |
-| [`rally-boundaries.md`](rally-boundaries.md) | Rally start/end decisions, refine keep/drop (has a maintenance contract) |
+| [`detection-spec.md`](detection-spec.md) | Detection internals, thresholds, learnable parameters |
+| [`rally-boundaries.md`](rally-boundaries.md) | Rally start/end decisions and the refine keep/drop stage |
 
-Both were last verified 2026-07-20 and predate the Review stage and the
-2026-08-05 coaching redesign described here.
-
-**Last verified against code: 2026-08-08.**
+Both were last checked against the code on 2026-07-20, before the Review stage
+and the coaching redesign described here existed. This document was last checked
+on 2026-08-08.
 
 ---
 
@@ -146,9 +144,10 @@ dead but revivable.
 - **YOLO11-pose + ByteTrack** for tracked player identity. The tracker config is
   passed as an absolute `bytetrack.yaml` path — the bare filename cost ~29% of Pass 2
   runtime ([`players.py:31-36`](../backend/app/cv/players.py#L31-L36)).
-- **OpenVINO on the Intel Arc GPU** (`device="intel:gpu"`). Ultralytics torch
-  `device='xpu'` throws, so the pose model is exported to OpenVINO and cached per
-  `(imgsz, precision)`. Torch/CPU fallback is ~6× slower.
+- **Device selection.** On the EC2 worker, pose runs through PyTorch on CUDA
+  (`CV_DEVICE=cuda`). On Intel Arc machines, Ultralytics cannot drive
+  `device='xpu'`, so the pose model is exported to OpenVINO (`device="intel:gpu"`)
+  and cached per `(imgsz, precision)`; the CPU fallback is about 6× slower.
 - **`pose_imgsz=1920`**, chosen from measured far-player recall:
 
   | imgsz | far-player recall | ms/frame |
@@ -166,10 +165,9 @@ dead but revivable.
   motion-primary trajectory selector, velocity gate, arc RANSAC, Kalman smoothing,
   and hit/bounce classification. External trackers can POST to `/videos/{id}/ball_track`.
 
-> ⚠️ **Ball detection defaults to OFF in code** (`PASS2_BALL_ENABLED = False`,
-> [`config.py:96-102`](../backend/app/config.py#L96-L102), ~11% of Pass 2 cost) — but this
-> machine's `.env` sets `PASS2_BALL=1`, so it **is on here**. Check the effective
-> value before reasoning about ball-dependent behaviour.
+> **Note:** Pass 2 ball detection is off by default (`PASS2_BALL_ENABLED = False`
+> in [`config.py`](../backend/app/config.py), about 11% of Pass 2 cost). Set
+> `PASS2_BALL=1`, or use a hardware profile that enables it, to turn it on.
 
 ### Output
 
@@ -210,7 +208,7 @@ the keep/drop UI; it does not move boundaries.
 | **Player IDs** | None (stale boxes) | Stable slots + shirt numbers |
 | **Ball** | Coarse blobs (gate signal) | Full chain, arcs, bounce/hit, 3D height |
 | **Calibration** | Optional (fallback gate) | **Required** |
-| **Writes rally_labels** | ✅ Sole authority | ❌ Never |
+| **Writes rally_labels** | Yes (sole authority) | Never |
 | **Trigger** | Automatic on upload | User-triggered via Review |
 | **Bias** | Recall — over-emit | Precision |
 
@@ -312,11 +310,11 @@ starting point for collecting labels, never a validated answer.
 
 ## 10. Known gaps
 
-- 🐛 **`tip_feedback` table is missing from the schema.** `db.py` no longer contains
-  its `CREATE TABLE`, but [`rally_analysis.py:178`](../backend/app/api/rally_analysis.py#L178)
-  still inserts into it and [`coaching.py:1837`](../backend/app/rallyanalysis/coaching.py#L1837)
-  still reads it. Existing databases have the table from before, so this is invisible
-  locally and **breaks any fresh install** with `no such table: tip_feedback`.
+- **`tip_feedback` table is missing from the schema.** `db.py` no longer contains
+  its `CREATE TABLE`, but [`rally_analysis.py`](../backend/app/api/rally_analysis.py)
+  still inserts into it and [`coaching.py`](../backend/app/rallyanalysis/coaching.py)
+  still reads it. Databases created before the change still have the table; a fresh
+  database fails with `no such table: tip_feedback`.
 - **Ball tracking is the accuracy ceiling.** Far-baseline height is unusable; contact
   detection avoids the ball entirely for this reason.
 - **Paddle is never tracked.** No paddle position or face angle exists anywhere, so
@@ -325,8 +323,8 @@ starting point for collecting labels, never a validated answer.
   preparation, sequencing and follow-through are not measured.
 - **Positioning ignores the ball and the opponent.** Bands are fixed court geometry;
   nothing conditions "correct position" on where the ball actually is.
-- **Two boundary docs predate this one** (verified 2026-07-20) and describe crossing
-  detection and end-trimming slightly differently from current `pass1.py`.
+- **The two companion docs predate this one** (checked 2026-07-20) and describe
+  crossing detection and end-trimming slightly differently from current `pass1.py`.
 
 ---
 
