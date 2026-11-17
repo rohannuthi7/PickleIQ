@@ -1,18 +1,42 @@
+# Environment
 .env
-data/
-weights/
+.env.*
+!.env.example
+
+# Python
 __pycache__/
 *.pyc
 .venv/
+.pytest_cache/
+*.egg-info/
+
+# Node
 node_modules/
 frontend/dist/
+
+# Runtime data (videos, SQLite database, trained models)
+data/
+weights/
 *.log
 
 # Video files: footage is data, never source
 *.mp4
 *.mov
 
+# Model weights and binaries (one pinned pose model stays tracked)
+*.pt
+!backend/yolo11n-pose.pt
+*.onnx
+*_openvino_model/
+*.pkg
+
 # Local developer tooling
 .claude/
 CLAUDE.md
 graphify-out/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
