@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { drawBall, drawPlayers, entryAt, layoutCanvas } from './src/overlayDraw.js'
+import { drawBall, drawPlayers, entryAt, layoutCanvas } from '../src/overlayDraw.js'
 
 // Minimal recording stand-in for a CanvasRenderingContext2D.
 const fakeCtx = () => {
