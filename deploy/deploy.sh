@@ -55,7 +55,7 @@ echo "==> pushing"
 docker push "$IMAGE"
 
 echo "==> restarting local container"
-./scripts/restart-local.sh
+./deploy/restart-local.sh
 LOCAL_ID="$(docker inspect picklecv-local --format '{{.Image}}')"
 if [ "$LOCAL_ID" != "$NEW_ID" ]; then
   echo "!! local container is running $LOCAL_ID, expected $NEW_ID — restart-local.sh may have failed" >&2
@@ -79,7 +79,7 @@ echo "    instance at $IP"
 
 echo "==> restarting EC2 worker container"
 scp -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new \
-  scripts/restart-ec2.sh "$SSH_USER@$IP:/tmp/restart-ec2.sh"
+  deploy/restart-ec2.sh "$SSH_USER@$IP:/tmp/restart-ec2.sh"
 
 # Installs restart-ec2.sh to a permanent path (survives the ephemeral NVMe
 # wipe a stop/start does to /opt/dlami/nvme — /opt/picklecv lives on the
