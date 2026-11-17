@@ -26,8 +26,9 @@ flowchart LR
     B[Browser<br/>React UI] -->|upload video| UI[UI container<br/>FastAPI]
     UI -->|store video| S3[(Amazon S3)]
     S3 -->|ObjectCreated event| L[AWS Lambda<br/>starts the instance]
+    S3 -->|ObjectCreated event| Q[Amazon SQS<br/>job queue]
     L --> W[EC2 GPU worker<br/>Docker + CUDA]
-    W -->|poll for new videos<br/>and Pass 2 requests| S3
+    Q -->|long-poll for new videos<br/>and Pass 2 requests| W
     W -->|rally windows, overlays,<br/>coaching report| S3
     S3 -->|sync results| UI
     UI --> B
@@ -37,8 +38,9 @@ flowchart LR
    (`RUN_PROCESSING=0`), which stores it in S3. That container never runs
    computer vision; it uploads, displays, and syncs results.
 2. **Wake the worker.** An S3 event triggers a Lambda function that starts the
-   EC2 GPU instance. The Lambda only powers the instance on. Once running, the
-   worker's `cloud_ingest` thread polls S3 for videos it has not processed yet.
+   EC2 GPU instance, and the same event is queued in SQS. Once running, the
+   worker's `cloud_ingest` thread long-polls the queue for new videos and Pass 2
+   requests. A periodic bucket scan catches any notification that is lost.
 3. **Pass 1: find candidate rallies.** The worker scans the whole clip at low
    resolution and every third frame. A rally is live while a fast, ball-sized blob
    keeps crossing the net, projected through a court homography. Windows are
@@ -71,7 +73,7 @@ user's review step does not force a cold start. For details, see
 | Modelling | NumPy, SciPy, XGBoost (optional rally classifier) |
 | Coaching | Anthropic Claude API |
 | Frontend | React 18, Vite 5 |
-| Infrastructure | Docker (CUDA 12.6), AWS S3, Lambda, EC2, ECR, Secrets Manager |
+| Infrastructure | Docker (CUDA 12.6), AWS S3, SQS, Lambda, EC2, ECR, Secrets Manager |
 
 ## Repository layout
 
@@ -131,8 +133,8 @@ and reused for every clip from the same camera setup.
 **Environment variables** (all optional locally; see [`.env.example`](.env.example)):
 `ANTHROPIC_API_KEY`, `ANTHROPIC_COACHING_MODEL`, `ANTHROPIC_REPORT_MODEL`,
 `CV_DEVICE`, `HW_PROFILE`, `POSE_MODEL`, `TRACKNET_ENABLED`, `TRACKNET_WEIGHTS`,
-`PASS2_BALL`, `DATA_DIR`, `STORAGE_BACKEND`, `S3_VIDEO_BUCKET`, `AWS_REGION`,
-`RUN_PROCESSING`.
+`PASS2_BALL`, `DATA_DIR`, `STORAGE_BACKEND`, `S3_VIDEO_BUCKET`, `SQS_JOB_QUEUE_URL`,
+`AWS_REGION`, `RUN_PROCESSING`.
 
 **Tests:**
 
@@ -160,9 +162,10 @@ cd backend
   This is the one failing test.
 - **Single tenant.** S3 keys use a placeholder user id; there is no
   authentication or multi-user separation.
-- **Infrastructure is partly outside the repo.** The Lambda function, S3 event
-  notification, and IAM roles were set up in the AWS console and are not defined
-  here.
+- **Infrastructure is partly outside the repo.** The Lambda function and the EC2
+  instance were set up in the AWS console and are not defined here.
+  `deploy/setup-sqs.sh` creates the SQS queue, its bucket notification, and the
+  worker's extra IAM permissions.
 
 ## Contributors
 
