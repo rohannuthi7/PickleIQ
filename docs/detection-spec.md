@@ -137,7 +137,7 @@ overlay annotations**.
   Downstream this reads to refine's Stage B as a fixed, content-independent
   low `P(live)` ceiling — the actual cause of a "same p_live_max across
   rallies of very different length" report (see
-  `PASS1_PASS2_RALLY_BOUNDARIES.md` for the refine-side symptom). Fixed by
+  `rally-boundaries.md` for the refine-side symptom). Fixed by
   only pruning off-arc points when `refined.arcs` is non-empty — with zero
   arcs there is no fitted trajectory to judge "off-arc" against, so the raw
   per-frame picks are left in place instead.

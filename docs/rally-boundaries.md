@@ -3,7 +3,7 @@
 > **Scope of this document.** How rally **start/end boundaries** are decided:
 > how Pass 1 opens and closes a rally window, and how the Pass 2 *refinement*
 > module decides whether to **keep** a Pass 1 window, **move its start later**,
-> or **end it sooner**. This is a focused companion to `PASS1_PASS2_SPEC.md`
+> or **end it sooner**. This is a focused companion to `detection-spec.md`
 > (which covers the broader detection pipeline). Exact params and math are
 > quoted below; every threshold named is a config/param key.
 >
@@ -20,7 +20,7 @@
 > 2. Update `Key files & symbols` if a function/file moved or was renamed.
 > 3. Bump the `Last verified against code` date at the bottom and add a one-line
 >    entry to `Change log`.
-> 4. If the change also affects `PASS1_PASS2_SPEC.md`, update that too.
+> 4. If the change also affects `detection-spec.md`, update that too.
 >
 > Do not let this file silently rot. A stale boundary-logic doc is worse than
 > none — downstream agents trust it as source of truth.
@@ -30,7 +30,7 @@
 ## 0. Two meanings of "Pass 2" — do not conflate
 
 - **`cv/pass2.py`** — detection / visualization ONLY. Emits **no** `rally_labels`
-  and makes **no** boundary decisions. Per `PASS1_PASS2_SPEC.md`, Pass 1 is the
+  and makes **no** boundary decisions. Per `detection-spec.md`, Pass 1 is the
   sole authoritative boundary source.
 - **`backend/app/refine/`** — the *rally refinement* module (added after the
   original spec). This is what decides **keep / start-later / end-sooner** for
@@ -160,7 +160,7 @@ originally-reported "identical `p_live_max` across rallies of very different
 length" bug turned out to have a different, more direct root cause: Pass 2
 *did* run and had `td.present=1.0` throughout, but its ball detections were
 silently wiped by an over-eager noise filter — see
-`PASS1_PASS2_SPEC.md`'s "Arc-fit noise filter" note (`ball_filter.refine_track`
+`detection-spec.md`'s "Arc-fit noise filter" note (`ball_filter.refine_track`
 / `pass2.py`, fixed the same day). Both are real, independent bugs; this
 section's fix (and `min_tracking_coverage`) still stands on its own for the
 "Pass 2 truly never reached these frames" case reproduced locally.
@@ -320,7 +320,7 @@ currently JSON-only, not yet promoted to `rally_labels`.
 - `backend/app/refine/config.py` — `RefineConfig` (ALL refine thresholds/weights)
 - `backend/app/pipeline.py` — `_refine_after_pass2` hook
 - `backend/app/learning/params.py` — `LearnedParams` (all Pass 1 `p1_*` params)
-- `PASS1_PASS2_SPEC.md` — broader detection-pipeline spec (companion doc)
+- `detection-spec.md` — broader detection-pipeline spec (companion doc)
 
 ---
 
@@ -370,7 +370,7 @@ currently JSON-only, not yet promoted to `rally_labels`.
 - 2026-07-20 (same-day follow-up, after live EC2 verification) — Found the
   actual root cause of the reported bug: not `no_tracking_data` above, but
   `pass2.py`'s arc-fit noise filter wiping every real ball detection in a
-  window whenever it fit zero arcs (see `PASS1_PASS2_SPEC.md`). Fixed there;
+  window whenever it fit zero arcs (see `detection-spec.md`). Fixed there;
   no refine-module code changed for this one, but it's the reason
   `net_crossings_per_10s` was `0.0` and `p_live_max` capped at an identical
   ceiling across every window of the affected clip.

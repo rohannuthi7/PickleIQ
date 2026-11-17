@@ -8,8 +8,8 @@ authoritative for their own areas — read them before changing behaviour there:
 
 | Doc | Owns |
 |---|---|
-| [`PASS1_PASS2_SPEC.md`](PASS1_PASS2_SPEC.md) | Detection internals, thresholds, learnable params |
-| [`PASS1_PASS2_RALLY_BOUNDARIES.md`](PASS1_PASS2_RALLY_BOUNDARIES.md) | Rally start/end decisions, refine keep/drop (has a maintenance contract) |
+| [`detection-spec.md`](detection-spec.md) | Detection internals, thresholds, learnable params |
+| [`rally-boundaries.md`](rally-boundaries.md) | Rally start/end decisions, refine keep/drop (has a maintenance contract) |
 
 Both were last verified 2026-07-20 and predate the Review stage and the
 2026-08-05 coaching redesign described here.

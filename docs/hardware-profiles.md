@@ -44,7 +44,7 @@ weights existed to make enabling it worthwhile. `restart-ec2.sh` now sets
 `TRACKNET_ENABLED=1` directly instead of adopting this profile — simpler
 given the script already sets `CV_DEVICE`/`PASS2_BALL` the same explicit way,
 and `HW_PROFILE=cuda` would also silently pull in `precision`/`openvino`
-overrides this deployment hasn't evaluated. See `PASS1_PASS2_SPEC.md`'s
+overrides this deployment hasn't evaluated. See `detection-spec.md`'s
 "Arc-fit noise filter" / ball-observation section for why this now matters
 and the new S3 sync path for the weights file
 (`storage_s3.upload_tracknet_weights` / `cloud_ingest._sync_tracknet_weights`,
