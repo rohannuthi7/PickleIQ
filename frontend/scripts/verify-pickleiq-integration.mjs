@@ -9,7 +9,7 @@ import {
   remainingAnalysisSeconds,
   resolveFeedbackSeekSeconds,
   resolveRallySkipTarget,
-} from './src/pickleiq/processingAdapter.js'
+} from '../src/pickleiq/processingAdapter.js'
 
 const video = { fps: 30, jobs: [{ id: 'p1', kind: 'pass1', status: 'done', progress: 4 }] }
 const pass1 = normalizePass1ProcessingState(video, { pass1: [] })
