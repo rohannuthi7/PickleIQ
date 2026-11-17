@@ -6,7 +6,7 @@ labels (rally_labels source='human'), and user notes. Anything AI-derived
 (pass1/pass2 labels, overlays, refiner output) is excluded.
 
 Output layout:
-    exports/manual_tracking/
+    reference_data/manual_tracking/
         <safe-clipname>__<shortid>/
             manual_tracking.json
             <original video filename>
@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app import db  # noqa: E402
 from app.config import REPO_ROOT  # noqa: E402
 
-OUT_ROOT = REPO_ROOT / "exports" / "manual_tracking"
+OUT_ROOT = REPO_ROOT / "reference_data" / "manual_tracking"
 SCHEMA_VERSION = 1
 
 

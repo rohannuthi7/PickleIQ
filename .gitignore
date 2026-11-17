@@ -8,8 +8,9 @@ node_modules/
 frontend/dist/
 *.log
 
-# Large exported videos (data, not source)
-exports/**/*.mp4
+# Video files: footage is data, never source
+*.mp4
+*.mov
 
 # Local developer tooling
 .claude/
