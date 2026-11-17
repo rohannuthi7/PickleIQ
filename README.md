@@ -103,8 +103,8 @@ Prerequisites: Python 3.12, Node.js 18 or later. A GPU is optional; without one,
 inference runs on the CPU.
 
 ```powershell
-git clone https://github.com/rohannuthi7/CV-Training-Tool.git
-cd CV-Training-Tool
+git clone https://github.com/rohannuthi7/PickleIQ.git
+cd PickleIQ
 
 py -3.12 -m venv backend\.venv
 backend\.venv\Scripts\pip install -r backend\requirements.txt
