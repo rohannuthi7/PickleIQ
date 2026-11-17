@@ -1793,7 +1793,7 @@ def singles_pid_map(contacts: list[dict], match_type: str | None) -> dict:
 
 
 def merge_singles_players(contacts: list[dict], match_type: str | None) -> list[dict]:
-    """Stopgap for player-identity mis-tracking (see "Known gaps" in docs/pipeline-overview.md):
+    """Stopgap for player-identity mis-tracking (see cv/identity.py):
     if this clip is tagged singles but contact_events carries more than 2
     distinct player_ids (spurious/phantom identities from the pose tracker),
     fold every contact from a non-top-2 player into whichever of the top-2
