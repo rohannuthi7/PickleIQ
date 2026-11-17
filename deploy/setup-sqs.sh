@@ -106,4 +106,4 @@ sed -i '' "s#SQS_JOB_QUEUE_URL=\"\${SQS_JOB_QUEUE_URL:-}\"#SQS_JOB_QUEUE_URL=\"\
 
 echo
 echo "==> done. Queue: $QUEUE_URL"
-echo "    Next: ./deploy.sh   (run from scripts/, or repo root's scripts/deploy.sh)"
+echo "    Next: ./deploy/deploy.sh   (run from the repo root)"
