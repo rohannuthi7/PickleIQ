@@ -1,16 +1,14 @@
-# Ball Detection — In-Depth Guide
+# Ball detection
 
 This document explains how the pickleball ball is detected, tracked, filtered, and
-turned into hit/bounce events, and — importantly for anyone **consuming the data** —
-what each output field means, where it comes from, and how much to trust it.
+turned into hit/bounce events, and, for anyone consuming the data, what each
+output field means, where it comes from, and how much to trust it.
 
-> TL;DR for data consumers: the per-frame ball position lives in the **Pass 2 overlay
+> **Summary for data consumers:** the per-frame ball position lives in the **Pass 2 overlay
 > entries** under the `ball` key (`[x, y, diameter_px, confidence]`, full-resolution
 > image pixels). Bounce/hit events live under the `evt` key with a court-space position
 > and an in/out call. Ball tracking is the accuracy ceiling of the whole system; treat
 > far-court positions and bounce recall as the weakest links.
-
----
 
 ## 1. Two passes, two very different ball jobs
 
@@ -18,17 +16,15 @@ The system runs two passes over each clip, and the ball means something differen
 
 | | Pass 1 (`cv/pass1.py`) | Pass 2 (`cv/pass2.py`) |
 |---|---|---|
-| Coverage | 100% of the clip, low-res / sub-sampled | Only inside Pass 1 rally windows (~20%), full-res, full frame rate |
+| Coverage | 100% of the clip, low-res / sub-sampled | Only inside the rally windows the user selects (~20%), full-res, full frame rate |
 | Ball's role | **Cheap signal**: "is a fast ball-sized blob crossing the net?" — used to decide where rallies are | **Precise per-frame position** for display + bounce/hit events |
-| Detector | Classical motion blob (`MotionBallDetector`) at low res | TrackNet (if weights) → else classical fallback → optional external track → manual corrections |
+| Detector | Classical motion blob (`MotionBallDetector`) at low res | Manual corrections → external track → TrackNet (when enabled) → classical fallback |
 | Output | Rally start/end boundaries (`rally_labels`, `source='pass1'`) | Per-frame overlay entries with `ball`, `world`, `evt` |
 
 Pass 1 is the **sole source of rally boundaries**. Pass 2 no longer computes rallies —
 its ball outputs are **display / analysis only** and drive no boundary decisions. So a
 wrong ball position in Pass 2 is cosmetic; a missed net-crossing in Pass 1 can drop a
 whole rally.
-
----
 
 ## 2. The raw detector (`cv/ball_coarse.py`)
 
@@ -56,29 +52,38 @@ motion between three frames, so it loses the ball for many frames around bounces
 the far court where the ball is only a few pixels wide. This is the single biggest
 source of downstream error.
 
----
-
 ## 3. TrackNet — the real per-frame model (`cv/ball_tracknet.py`)
 
 The intended production detector is **TrackNetV2**, a VGG-style U-Net that takes 3 RGB
 frames in and emits 3 heatmaps out (one per frame); the ball is the heatmap argmax.
 
-- Architecture byte-for-byte mirrors NTT's WASB-SBDT so their **pretrained
-  tennis/badminton checkpoints load directly** (`scripts/get_tracknet_weights.py`).
-- Runs on the **Intel Arc GPU via OpenVINO** (FP16 IR cached next to the weights). Eager
-  torch-XPU runs this U-Net at ~110 ms/frame; OpenVINO is the production path.
+- The architecture mirrors NTT's WASB-SBDT exactly, so their **pretrained
+  tennis/badminton checkpoints load directly** (`backend/scripts/get_tracknet_weights.py`).
+- Inference runs through PyTorch on CUDA on the EC2 worker. On Intel Arc machines it
+  uses OpenVINO (FP16 IR cached next to the weights), because eager torch-XPU runs
+  this U-Net at about 110 ms/frame. The hardware profile can turn OpenVINO off.
 - `infer_triplet(frames)` returns `(x, y, diameter_px, confidence)` in **original frame
   pixels**, or `None` below `conf_threshold` (default 0.5). `last_peak` keeps the raw
   argmax regardless of threshold, so diagnostics can tell a true miss from a
   sub-threshold detection.
 
-**Status:** gated by `TRACKNET_ENABLED` / `TRACKNET_WEIGHTS`. Until weights are
-installed, Pass 2 falls back to the classical detector and logs a warning. Tennis
-weights transfer the "small fast ball" prior but the fixed down-the-baseline pickleball
-view still needs fine-tuning, especially on far-baseline balls. Training data source:
-the labeling UI's ball spot-corrections + stored FeatureTraces.
+**Status:** gated by `TRACKNET_ENABLED` / `TRACKNET_WEIGHTS`, off by default in code
+and enabled on the EC2 worker. Without weights, Pass 2 falls back to the classical
+detector and logs a warning. Pretrained tennis weights did not transfer to this fixed
+down-the-baseline pickleball view, so the model was fine-tuned on hand-labelled frames
+from the labelling UI's ball corrections:
 
----
+1. `backend/scripts/export_tracknet_dataset.py` builds 3-frame training samples from
+   `ball_corrections`, using the same resize and channel order as inference.
+2. `backend/scripts/finetune_tracknet.py` runs a full fine-tune from the WASB-SBDT
+   checkpoint (low learning rate, BCE against Gaussian heatmaps, loss masked to
+   labelled frames only).
+3. `backend/scripts/upload_tracknet_weights.py` ships the checkpoint to S3, and the
+   EC2 worker downloads it on its next poll.
+
+On a real 7,413-frame clip, the classical detector observed the ball in about 0.5% of
+frames; the fine-tuned model observed it in 2,525 frames (34%). See
+[`detection-spec.md`](detection-spec.md).
 
 ## 4. Ball source priority in Pass 2
 
@@ -89,18 +94,17 @@ manual correction  >  external track  >  TrackNet  >  classical detector
 ```
 
 - **Manual corrections** (`ball_corrections` table): user spot-fixes in the labeling
-  tab, clip-local, always authoritative. Exportable via `scripts/ball_gt_io.py` to
-  `reference_data/ball_gt.json` (git-tracked) so a partner can read/re-import them.
+  tab, clip-local, always authoritative. Exportable via `backend/scripts/ball_gt_io.py`
+  to `reference_data/ball_gt.json` (tracked in git) so they can be shared and
+  re-imported.
 - **External track** (`ball_tracks` table): a dense per-frame track from an outside
-  tracker (e.g. an MTI / temporal-integration tracker), uploaded via
-  `POST /videos/{id}/ball_track`. Values are `[x, y, diameter|null, confidence]` in
+  tracker, uploaded via `POST /api/videos/{id}/ball_track`
+  (see [`external-ball-tracker.md`](external-ball-tracker.md)). Values are `[x, y, diameter|null, confidence]` in
   full-res pixels. Preferred over the classical detector.
 - **TrackNet** / **classical**: as above.
 
 Whatever the source (except manual corrections), the detection is re-checked against the
 **same semantic filter** (stages 1–2 below) before being accepted.
-
----
 
 ## 5. The semantic filtering layer (`cv/ball_filter.py`)
 
@@ -159,10 +163,8 @@ Nearby duplicate bounces (double-splits of one physical event) are merged, keepi
 larger-angle one.
 
 > **Measured limitation:** bounce **recall** is capped by *track* quality, not this
-> logic — the detector loses the ball for 12+ frames at most bounces. That's TrackNet
-> (Phase 2) territory. Don't expect every real bounce to appear as an `evt`.
-
----
+> logic: the classical detector loses the ball for 12+ frames at most bounces. Do not
+> expect every real bounce to appear as an `evt`.
 
 ## 6. The trajectory selector (`cv/ball_track.py`)
 
@@ -191,8 +193,6 @@ Court-region gate (`_in_court_region` in pass2): candidates whose court-plane pr
 falls well outside this court (neighbouring courts, spectators) are dropped before the
 selector even sees them.
 
----
-
 ## 7. Smoothing & 3D reconstruction
 
 After selection + filtering, the surviving observations are:
@@ -200,8 +200,6 @@ After selection + filtering, the surviving observations are:
   (`max_gap ≈ 0.4 s`) and gates outliers (`gate2`).
 - Reconstructed to **court position + height** (`reconstruct_world`, `cv/bounce.py`)
   using the calibrated `CameraModel`. Attached to each entry as `world`.
-
----
 
 ## 8. Output data — what a consumer actually reads
 
@@ -233,8 +231,6 @@ floor). The `in`/`out` call is derived from `court.in_court`.
 **Ground-truth marks** (for evaluating any of the above) export to
 `reference_data/ball_gt.json` via `python -m backend.scripts.ball_gt_io export`.
 
----
-
 ## 9. How much to trust it (caveats for consumers)
 
 - **Ball tracking is the system's accuracy ceiling.** Player detection is now reliable;
@@ -242,29 +238,31 @@ floor). The `in`/`out` call is derived from `court.in_court`.
 - **Far-court positions** are least reliable — the ball is a few pixels wide, the
   classical detector often misses it, and the velocity gate is tightest there.
 - **Bounce recall is limited by detector dropouts** around the bounce (12+ frames lost),
-  not by the event logic. Missing bounces are expected until TrackNet is fine-tuned.
+  not by the event logic. Missing bounces are expected, especially on the classical
+  path.
 - **`confidence == 0.0` / `interp == true` = interpolated**, not observed. Treat these
   positions as a smooth guess between real detections; they're never filled across long
   gaps precisely because long-gap fills were the worst error source.
 - **Everything in Pass 2 is display/analysis only** — it does not affect rally
   boundaries (those come from Pass 1).
-- The **classical detector is a fallback.** For best accuracy install TrackNet weights or
-  supply an external track via `POST /videos/{id}/ball_track`.
-
----
+- The **classical detector is a fallback.** For best accuracy, enable TrackNet with
+  fine-tuned weights or supply an external track via `POST /api/videos/{id}/ball_track`.
 
 ## 10. File map
+
+Paths under `cv/` are relative to `backend/app/`.
 
 | File | Responsibility |
 |---|---|
 | `cv/ball_coarse.py` | Classical three-frame-diff detector + shared player-box margins |
-| `cv/ball_tracknet.py` | TrackNetV2 model, OpenVINO/Arc inference |
+| `cv/ball_tracknet.py` | TrackNetV2 model; CUDA, OpenVINO, or CPU inference |
 | `cv/ball_track.py` | Trajectory selector (motion-based ball vs. foot) |
 | `cv/ball_filter.py` | Velocity gate, box motion logic, arc RANSAC, hit/bounce classification |
 | `cv/pass1.py` | Low-res net-crossing gate → rally boundaries |
 | `cv/pass2.py` | Full-res per-frame ball orchestration + overlay output |
 | `cv/kalman.py`, `cv/bounce.py` | Smoothing + 3D world reconstruction |
-| `scripts/ball_gt_io.py` | Export/import ground-truth ball marks |
-| `scripts/eval_ball_filter.py`, `scripts/eval_matrix.py` | Evaluation harnesses |
+| `backend/scripts/ball_gt_io.py` | Export/import ground-truth ball marks |
+| `backend/scripts/eval_ball_filter.py`, `backend/scripts/eval_matrix.py` | Evaluation harnesses |
+| `backend/scripts/export_tracknet_dataset.py`, `backend/scripts/finetune_tracknet.py` | TrackNet fine-tuning |
 </content>
 </invoke>
