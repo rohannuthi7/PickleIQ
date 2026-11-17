@@ -16,5 +16,16 @@ numpy
 opencv-python
 ultralytics          # YOLO11-pose + ByteTrack (weights auto-download)
 lapx                 # assignment solver used by the tracker
-anthropic            # discrepancy-analysis report only
+anthropic            # coaching and discrepancy reports
+scipy                # refine/ballistic.py (imported on every Pass 2 run)
+matplotlib           # refine/diagnostics.py (imported on every Pass 2 run)
+pyyaml               # refine config override, api/annotate.py
+requests             # self_stop.py
+
+# Optional: xgboost (refine classifier backend) and openvino (Intel GPU
+# inference); the code falls back when they are absent. boto3 is required only
+# when STORAGE_BACKEND=s3.
+
+# Development
+pytest
 pyflakes             # undefined-name check, run by deploy/deploy.sh before every deploy
