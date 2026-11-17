@@ -52,7 +52,7 @@ motion between three frames, so it loses the ball for many frames around bounces
 the far court where the ball is only a few pixels wide. This is the single biggest
 source of downstream error.
 
-## 3. TrackNet — the real per-frame model (`cv/ball_tracknet.py`)
+## 3. TrackNet: the real per-frame model (`cv/ball_tracknet.py`)
 
 The intended production detector is **TrackNetV2**, a VGG-style U-Net that takes 3 RGB
 frames in and emits 3 heatmaps out (one per frame); the ball is the heatmap argmax.
@@ -112,14 +112,14 @@ Physics + player context on top of the raw candidates. Detector-agnostic. Four s
 the first two run **online** (per frame, before trajectory selection); the last two run
 **batch** (per window, after selection). Toggle with `ball_filter_enabled`.
 
-### Stage 1 — Velocity gate (`BallFrameFilter._velocity_ok`)
+### Stage 1: Velocity gate (`BallFrameFilter._velocity_ok`)
 Reject candidates implying an impossible jump from the last confirmed ball position. The
 max plausible pixel step is derived from the **homography** (local px→metre scale at the
 candidate) and a generous max ball speed (65 mph × 1.6 headroom). Because the far court
 has more metres per pixel, the gate **tightens automatically** in the far court, where a
 real ball moves fewer pixels per frame.
 
-### Stage 2 — Player-box motion logic (`BallFrameFilter._persistent`)
+### Stage 2: Player-box motion logic (`BallFrameFilter._persistent`)
 The ball is legitimately inside a player box at every paddle contact, so boxes are never
 blanket-suppressed. Instead:
 - candidates in the bottom `foot_zone_frac` (0.25) of a box are **feet/shoes → reject**;
@@ -130,7 +130,7 @@ blanket-suppressed. Instead:
 Per-candidate outcomes are recorded in `last_reasons` (`kept` / `foot_zone` /
 `persistent` / `velocity`) for diagnostics, and counted in `RejectStats`.
 
-### Stage 3 — Arc segmentation + RANSAC (`refine_track`)
+### Stage 3: Arc segmentation + RANSAC (`refine_track`)
 The per-frame selected track is split into per-shot **arcs** at sharp direction changes
 and time gaps (`_segment`). A split needs **both** a big turn angle **and** a big
 velocity-vector change (`split_dv_px`) — angle alone shreds slow far-court shots (a few
@@ -148,7 +148,7 @@ tolerance). Off-arc points are dropped as outliers; short holes between real poi
 Off-arc leftovers get one rescue chance: if an adjacent arc extrapolates to them within
 a loose tolerance they're kept as a shot stub; otherwise they're discarded as noise.
 
-### Stage 4 — Hit / bounce classification (`classify_arc_events`)
+### Stage 4: Hit / bounce classification (`classify_arc_events`)
 Events come from two signals:
 1. **Arc junctions** — a real direction change between adjacent arcs. At/near a player
    box → **hit** (paddle contact); in open court → **bounce**. Bounce junctions also
@@ -201,7 +201,7 @@ After selection + filtering, the surviving observations are:
 - Reconstructed to **court position + height** (`reconstruct_world`, `cv/bounce.py`)
   using the calibrated `CameraModel`. Attached to each entry as `world`.
 
-## 8. Output data — what a consumer actually reads
+## 8. Output data: what a consumer actually reads
 
 Pass 2 writes overlay entries (one per frame) via `overlays.write_entries`. Relevant
 ball fields on each entry:

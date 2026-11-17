@@ -39,7 +39,7 @@ is the reason the two passes can afford to be so different.
 
 ---
 
-## 2. Pass 1 — the coarse gate
+## 2. Pass 1: the coarse gate
 
 **Job:** scan 100% of the footage cheaply and answer only *"is a rally roughly
 happening here?"* It favours recall — generous, padded windows — because Review
@@ -91,7 +91,7 @@ one window — an accepted trade-off, and part of why Review exists.
 
 ---
 
-## 3. Review — the human gate
+## 3. Review: the human gate
 
 **The cheapest accuracy in the system.** Rather than making Pass 1 smart enough to
 be right, the user confirms it in seconds.
@@ -122,7 +122,7 @@ It then submits **one** Pass 2 job scoped to exactly those windows
 
 ---
 
-## 4. Pass 2 — precise detection
+## 4. Pass 2: precise detection
 
 **Job:** produce an accurate per-frame player (and optionally ball) overlay
 *inside the selected windows only* — roughly 20% of the clip, at full frame rate
@@ -186,7 +186,7 @@ Height comes from apparent-ball-size depth reconstruction, and degrades honestly
 σ ≈ 0.12 m near the camera but **≈0.57 m at the far baseline**, where height is set
 `NaN` rather than guessed.
 
-### Refine — active but advisory
+### Refine: active but advisory
 
 [`backend/app/refine/`](../backend/app/refine/) scores each window (tracking → P(live)
 classifier, XGBoost when importable → smoothing → serve gate) into
@@ -230,7 +230,7 @@ covered rally is dropped rather than half-analysed.
 
 ---
 
-## 7. Coaching report — spikes to tips
+## 7. Coaching report: spikes to tips
 
 Since the **2026-08-05 redesign**, detection is **continuous per-frame**, not
 per-shot. This matters: the older per-shot code (`compute_feature_vector`,
