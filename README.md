@@ -4,10 +4,9 @@ PickleIQ turns fixed-camera pickleball match video into segmented rallies and
 per-player coaching feedback, for recreational players and the clubs that film
 their courts.
 
-> **Screenshot placeholder.** Add `docs/images/results.png` (the Results screen:
-> per-player feedback on the left, the video with player overlays and the
-> timestamped tip list on the right) and replace this note with
-> `![PickleIQ results screen](docs/images/results.png)`.
+![PickleIQ results screen: per-player coaching takeaways on the left, the match video and timestamped tips on the right](docs/images/results.png)
+
+*Results screen: per-player takeaways, and tips that jump to the moment in the video.*
 
 ## Key results
 
@@ -59,6 +58,15 @@ flowchart LR
    always come from the pipeline's own data, never from the model.
 7. **Results.** The UI plays the original video with dead time skipped and tips
    linked to their timestamps. The video is never re-encoded.
+
+<p align="center">
+  <img src="docs/images/court-overlay.png" width="720"
+       alt="Pass 2 overlay: court model, four tracked player skeletons labelled P1 to P4, and the ball's trail with its reconstructed height">
+</p>
+
+*Pass 2 output drawn over a calibrated court: tracked skeletons with stable player
+numbers, regions outside the court masked in red, and the ball's trail with its
+reconstructed height above the court.*
 
 When idle, the worker stops itself (`self_stop.py`), with grace periods so the
 user's review step does not force a cold start. For details, see
