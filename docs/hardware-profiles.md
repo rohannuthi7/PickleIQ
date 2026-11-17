@@ -1,13 +1,13 @@
 # Hardware profiles (`HW_PROFILE`)
 
-A per-machine bundle of **speed** knobs — device, precision, OpenVINO on/off,
-TrackNet on/off, Pass 1 subsampling. Point is to tune each person's GPU for
-their own throughput. **Not** for making two machines produce identical
-output — that is explicitly not a goal.
+A hardware profile is a per-machine bundle of speed settings: device, precision,
+OpenVINO on/off, TrackNet on/off, and Pass 1 subsampling. Profiles tune each
+machine for its own throughput. They are not meant to make two machines produce
+identical output.
 
-Separate from `LearnedParams` (`backend/app/learning/params.py`): those are
-detection-quality tunables that compound globally via the report. Hardware
-profiles never touch that table.
+Profiles are separate from `LearnedParams` (`backend/app/learning/params.py`),
+which are detection-quality parameters shared across all machines. Hardware
+profiles never write to that table.
 
 ## Quick start
 
@@ -15,43 +15,31 @@ In `.env`:
 ```
 HW_PROFILE=cuda
 ```
-Unset (or a name not in `hw_profiles.json`... unset is fine, an unknown name
-errors — see below) → today's plain `CV_DEVICE`/`TRACKNET_ENABLED`/`PASS2_BALL`
-behavior, unchanged.
+If `HW_PROFILE` is unset, the plain `CV_DEVICE` / `TRACKNET_ENABLED` /
+`PASS2_BALL` settings apply unchanged. An unknown profile name is an error (see
+[Precedence rules](#precedence-rules)).
 
 ## Where it lives
 
 - **`backend/app/hw_profile.py`** — the schema (`PROFILE_DEFAULTS`) and the
   loader (`active_profile()`). This is the only file that knows the shape of
   a profile.
-- **`backend/app/hw_profiles.json`** — the actual profiles, committed to git
-  (unlike `data/`, which is gitignored) so a branch carries everyone's
-  profile. **Adding a machine = adding a JSON block here. No code change.**
+- **`backend/app/hw_profiles.json`** — the profiles themselves, tracked in git so
+  every checkout has them. Adding a machine means adding a JSON block here; no
+  code change is needed.
 
 Current profiles:
 
 | Name | Machine | device | precision | openvino | tracknet | pass2_ball |
 |---|---|---|---|---|---|---|
-| `cuda` | this machine (NVIDIA) | `cuda` | `fp16` | off | on | on |
-| `arc140v` | partner's machine (Intel Arc 140V) | `xpu` | `fp16` | on | on | off |
+| `cuda` | NVIDIA GPU | `cuda` | `fp16` | off | on | on |
+| `arc140v` | Intel Arc 140V laptop | `xpu` | `fp16` | on | on | off |
 
-**Note (2026-07-21):** the `cuda` row above has said `tracknet: on` since this
-file was written, but `HW_PROFILE` is not actually set in the EC2 worker's
-deployed env (`scripts/restart-ec2.sh`) — so this row was never the thing
-actually turning TrackNet on there; `TRACKNET_ENABLED` stayed at its
-env-unset default of `False` (see Precedence rules below) until fine-tuned
-weights existed to make enabling it worthwhile. `restart-ec2.sh` now sets
-`TRACKNET_ENABLED=1` directly instead of adopting this profile — simpler
-given the script already sets `CV_DEVICE`/`PASS2_BALL` the same explicit way,
-and `HW_PROFILE=cuda` would also silently pull in `precision`/`openvino`
-overrides this deployment hasn't evaluated. See `detection-spec.md`'s
-"Arc-fit noise filter" / ball-observation section for why this now matters
-and the new S3 sync path for the weights file
-(`storage_s3.upload_tracknet_weights` / `cloud_ingest._sync_tracknet_weights`,
-mirroring how calibration syncs — see those two functions' docstrings, the
-closest thing to written documentation of that mechanism right now; a
-top-level AWS/deploy doc describing the hybrid S3 architecture doesn't
-currently exist in this repo despite being referenced elsewhere).
+**Deployment note:** the EC2 worker does not set `HW_PROFILE`. `deploy/restart-ec2.sh`
+sets `CV_DEVICE=cuda` and `TRACKNET_ENABLED=1` directly, so the `cuda` profile's
+`precision` and `openvino` values do not apply there. TrackNet weights reach the
+worker through S3 (`storage_s3.upload_tracknet_weights`,
+`cloud_ingest._sync_tracknet_weights`), the same way calibration does.
 
 ## Adding a new profile
 
@@ -83,15 +71,15 @@ Optional keys (omit unless you actually need them):
 | `openvino` | `cv/players.py` `_openvino_pose_dir`, `cv/ball_tracknet.py` `_openvino_infer` | `False` short-circuits the OpenVINO export/compile attempt entirely — set this on non-Intel GPUs to avoid a wasted export. |
 | `tracknet` | `config.py` → `TRACKNET_ENABLED` | Only used if the `TRACKNET_ENABLED` env var is **unset**; an explicit env var always wins. |
 | `pass2_ball` | `config.py` → `PASS2_BALL_ENABLED` | Same precedence as `tracknet`. |
-| `p1_scale`, `p1_frame_step` | `pipeline.py` `_with_hw_overrides()` | See below — the one tricky case. |
+| `p1_scale`, `p1_frame_step` | `pipeline.py` `_with_hw_overrides()` | See [below](#p1_scale-and-p1_frame_step). |
 | `pose_batch` | *(nothing yet)* | Schema placeholder. Pose inference is frame-serial today (`PoseTracker.update()` calls `model.track()` one frame at a time); there's no batch path to plug a batch size into without restructuring the Pass 2 loop. Add real wiring only once someone measures a GPU-bound pose stage. |
 
-## `p1_scale` / `p1_frame_step` — the one subtlety
+## `p1_scale` and `p1_frame_step`
 
-These two names already exist as **LearnedParams** — versioned, DB-stored,
-tuned globally by the discrepancy report. A hardware profile is NOT allowed
-to write to that table (would corrupt the "global learning" story for the
-other machine).
+These two names are also **LearnedParams**: versioned, stored in the database, and
+tuned globally by the discrepancy report. A hardware profile must not write to
+that table, or one machine's speed settings would leak into every other machine's
+baseline.
 
 So instead: `pipeline.py`'s `_with_hw_overrides()` takes the LearnedParams
 dict `get_latest()` just fetched and, **only if the active profile sets
@@ -120,8 +108,8 @@ the other machine (or the report) sees.
   safe to run under any profile.
 - **Learned values were measured under specific hardware** (e.g.
   `pose_imgsz=1920` benchmarks, ball thresholds) — switching device/precision
-  can shift detection results slightly. Expected and fine given the explicit
-  "no cross-machine reproducibility" goal; don't "fix" this later.
+  can shift detection results slightly. This is expected, since cross-machine
+  reproducibility is not a goal.
 - **Device/precision resolve once per process** (`lru_cache`d in
   `device.py`, module-level in `config.py`) — changing `HW_PROFILE` needs a
   **backend restart**. This is also why there's no frontend toggle: a
