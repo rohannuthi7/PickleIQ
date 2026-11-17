@@ -20,7 +20,6 @@ RUN pip3 install -r backend/requirements_cuda.txt --break-system-packages
 # backend/app/*.py's relative repo-root walk (see app/paths.py) lands on
 # /app here the same way it lands on the real repo root in local dev.
 COPY backend/ backend/
-COPY yolo11n-pose.pt backend/yolo11n-pose.pt
 
 # Belt-and-suspenders: paths.py honors this outright, so root resolution
 # doesn't silently break if the COPY layout above ever changes.
