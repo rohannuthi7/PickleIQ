@@ -10,3 +10,8 @@ frontend/dist/
 
 # Large exported videos (data, not source)
 exports/**/*.mp4
+
+# Local developer tooling
+.claude/
+CLAUDE.md
+graphify-out/
