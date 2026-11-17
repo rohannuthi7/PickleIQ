@@ -327,7 +327,7 @@ def _demo() -> None:
             kept += 1
     assert kept >= 3, f"real ball wrongly excluded (kept={kept})"
 
-    # Case 3: rohan's serve recovery + aadhi's limb-lock composing. Cold start
+    # Case 3: serve recovery and the limb-lock guard composing. Cold start
     # with seed_on_player permits a fast blob ON the server's box to seed the
     # track (the serve); once seeded, if that same blob then degenerates into
     # riding a wrist at a constant offset, the limb-lock guard drops it even
